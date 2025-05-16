@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI-Powered Google Calendar</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+        }
+
+        .sidebar {
+            background-color: #343a40;
+            color: white;
+            height: 100vh;
+            padding: 0;
+            position: sticky;
+            top: 0;
+        }
+
+        .main-content {
+            padding: 20px;
+        }
+
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .calendar-navigation {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .week-view {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .week-header {
+            display: grid;
+            grid-template-columns: 80px repeat(7, 1fr);
+            background-color: #f1f3f5;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .day-header {
+            padding: 10px;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .time-column {
+            padding: 10px;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .week-grid {
+            display: grid;
+            grid-template-columns: 80px repeat(7, 1fr);
+            grid-template-rows: repeat(48, 30px);
+            position: relative;
+        }
+
+        .time-slot {
+            border-bottom: 1px solid #e9ecef;
+            border-right: 1px solid #e9ecef;
+            position: relative;
+        }
+
+        .time-slot:first-child {
+            border-top: 1px solid #e9ecef;
+        }
+
+        .time-label {
+            position: absolute;
+            top: -10px;
+            left: 5px;
+            font-size: 0.8em;
+            color: #6c757d;
+        }
+
+        .event {
+            position: absolute;
+            background-color: #e3f2fd;
+            border-left: 3px solid #1976d2;
+            border-radius: 4px;
+            padding: 2px 5px;
+            overflow: hidden;
+            font-size: 0.85em;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .event:hover {
+            background-color: #bbdefb;
+            transform: scale(1.01);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .event-title {
+            font-weight: bold;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .event-time {
+            font-size: 0.8em;
+            color: #495057;
+        }
+
+        .assistant-container {
+            padding: 20px;
+            height: calc(100vh - 100px);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .assistant-header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .assistant-avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            margin-bottom: 10px;
+        }
+
+        .chat-container {
+            flex-grow: 1;
+            overflow-y: auto;
+            margin-bottom: 15px;
+            padding: 10px;
+            background-color: #2c3e50;
+            border-radius: 8px;
+        }
+
+        .message {
+            margin-bottom: 10px;
+            padding: 8px 12px;
+            border-radius: 18px;
+            max-width: 80%;
+        }
+
+        .user-message {
+            background-color: #007bff;
+            color: white;
+            margin-left: auto;
+            border-bottom-right-radius: 4px;
+        }
+
+        .assistant-message {
+            background-color: #495057;
+            color: white;
+            margin-right: auto;
+            border-bottom-left-radius: 4px;
+        }
+
+        .input-group {
+            margin-top: auto;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .sidebar {
+                height: auto;
+                position: relative;
+            }
+            
+            .week-header, .week-grid {
+                grid-template-columns: 60px repeat(7, 1fr);
+            }
+            
+            .time-column {
+                padding: 5px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <div class="col-md-3 sidebar">
+                <h2 class="text-center mt-3">AI Calendar</h2>
+                <div class="assistant-container">
+                    <div class="assistant-header">
+                        <img src="https://ui-avatars.com/api/?name=Henry&background=random" alt="AI Assistant" class="assistant-avatar">
+                        <h4>Henry</h4>
+                        <p>Your AI Calendar Assistant</p>
+                    </div>
+                    <div class="chat-container" id="chatContainer">
+                        <!-- Messages will appear here -->
+                        <div class="assistant-message message">
+                            Hi! I'm Henry, your AI calendar assistant. How can I help you with your schedule today?
+                        </div>
+                    </div>
+                    <div class="input-group mb-3">
+                        <input type="text" class="form-control" id="userQuery" placeholder="Ask about your schedule...">
+                        <button class="btn btn-primary" id="askButton">
+                            <i class="bi bi-send"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <div class="col-md-9 main-content">
+                <div class="calendar-header">
+                    <h1>My Calendar</h1>
+                    <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addEventModal">
+                        <i class="bi bi-plus-lg"></i> Add Event
+                    </button>
+                </div>
+
+                <!-- Calendar Navigation -->
+                <div class="calendar-navigation">
+                    <button class="btn btn-outline-primary" id="prevWeek">
+                        <i class="bi bi-chevron-left"></i>
+                    </button>
+                    <h3 id="currentWeek"></h3>
+                    <button class="btn btn-outline-primary" id="nextWeek">
+                        <i class="bi bi-chevron-right"></i>
+                    </button>
+                    <button class="btn btn-primary" id="todayBtn">Today</button>
+                </div>
+
+                <!-- Week View -->
+                <div class="week-view">
+                    <div class="week-header">
+                        <div class="time-column"></div>
+                        <div class="day-header">Monday</div>
+                        <div class="day-header">Tuesday</div>
+                        <div class="day-header">Wednesday</div>
+                        <div class="day-header">Thursday</div>
+                        <div class="day-header">Friday</div>
+                        <div class="day-header">Saturday</div>
+                        <div class="day-header">Sunday</div>
+                    </div>
+                    <div class="week-grid" id="weekGrid">
+                        <!-- Time slots will be generated here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Event Modal -->
+    <div class="modal fade" id="addEventModal" tabindex="-1" aria-labelledby="addEventModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addEventModalLabel">Add New Event</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="eventDescription" class="form-label">Describe your event in natural language:</label>
+                        <textarea class="form-control" id="eventDescription" rows="3" 
+                                  placeholder="e.g. 'Team meeting tomorrow at 2pm for 1 hour about the project'"></textarea>
+                    </div>
+                    <div class="form-text">Our AI will parse the details automatically</div>
+                    <div id="parsedDetails" class="mt-3" style="display: none;">
+                        <h5>Event Details</h5>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="eventTitle" class="form-label">Title</label>
+                                <input type="text" class="form-control" id="eventTitle">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="eventLocation" class="form-label">Location</label>
+                                <input type="text" class="form-control" id="eventLocation">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="startDate" class="form-label">Start Date</label>
+                                <input type="date" class="form-control" id="startDate">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="startTime" class="form-label">Start Time</label>
+                                <input type="time" class="form-control" id="startTime">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="endDate" class="form-label">End Date</label>
+                                <input type="date" class="form-control" id="endDate">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="endTime" class="form-label">End Time</label>
+                                <input type="time" class="form-control" id="endTime">
+                            </div>
+                            <div class="col-12">
+                                <label for="eventNotes" class="form-label">Description</label>
+                                <textarea class="form-control" id="eventNotes" rows="2"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" id="parseEventBtn">Parse Event</button>
+                    <button type="button" class="btn btn-success" id="saveEventBtn" style="display: none;">Save Event</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Event Details Modal -->
+    <div class="modal fade" id="eventDetailsModal" tabindex="-1" aria-labelledby="eventDetailsModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="eventDetailsModalLabel">Event Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <h4 id="detailTitle"></h4>
+                    <p><strong>Time:</strong> <span id="detailTime"></span></p>
+                    <p><strong>Location:</strong> <span id="detailLocation"></span></p>
+                    <p><strong>Description:</strong> <span id="detailDescription"></span></p>
+                    <p><strong>Participants:</strong> <span id="detailParticipants"></span></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-danger" id="deleteEventBtn">Delete</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize variables
+            let currentDate = new Date();
+            let currentEventId = null;
+            
+            // DOM elements
+            const weekGrid = document.getElementById('weekGrid');
+            const currentWeekElement = document.getElementById('currentWeek');
+            const prevWeekBtn = document.getElementById('prevWeek');
+            const nextWeekBtn = document.getElementById('nextWeek');
+            const todayBtn = document.getElementById('todayBtn');
+            const parseEventBtn = document.getElementById('parseEventBtn');
+            const saveEventBtn = document.getElementById('saveEventBtn');
+            const eventDescription = document.getElementById('eventDescription');
+            const parsedDetails = document.getElementById('parsedDetails');
+            const askButton = document.getElementById('askButton');
+            const userQuery = document.getElementById('userQuery');
+            const chatContainer = document.getElementById('chatContainer');
+            
+            // Modal elements
+            const addEventModal = new bootstrap.Modal(document.getElementById('addEventModal'));
+            const eventDetailsModal = new bootstrap.Modal(document.getElementById('eventDetailsModal'));
+            const deleteEventBtn = document.getElementById('deleteEventBtn');
+            
+            // Check authentication status
+            function checkAuth() {
+                fetch('/')
+                    .then(response => {
+                        if (response.redirected) {
+                            window.location.href = response.url;
+                        }
+                    });
+            }
+            
+            // Initialize the calendar
+            function initCalendar() {
+                checkAuth();
+                updateWeekDisplay();
+                generateTimeSlots();
+                loadEvents();
+            }
+            
+            // Update the current week display
+            function updateWeekDisplay() {
+                const startOfWeek = getStartOfWeek(currentDate);
+                const endOfWeek = new Date(startOfWeek);
+                endOfWeek.setDate(startOfWeek.getDate() + 6);
+                
+                const options = { month: 'long', day: 'numeric' };
+                const startStr = startOfWeek.toLocaleDateString('en-US', options);
+                const endStr = endOfWeek.toLocaleDateString('en-US', options);
+                
+                currentWeekElement.textContent = `${startStr} - ${endStr}, ${startOfWeek.getFullYear()}`;
+            }
+            
+            // Get the start of the week (Monday)
+            function getStartOfWeek(date) {
+                const d = new Date(date);
+                const day = d.getDay();
+                const diff = d.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is Sunday
+                return new Date(d.setDate(diff));
+            }
+            
+            // Generate time slots for the week view
+            function generateTimeSlots() {
+                weekGrid.innerHTML = '';
+                
+                // Create time labels
+                for (let hour = 0; hour < 24; hour++) {
+                    for (let minute = 0; minute < 60; minute += 30) {
+                        const timeSlot = document.createElement('div');
+                        timeSlot.className = 'time-slot';
+                        
+                        // First column is for time labels
+                        if (minute === 0) {
+                            const timeLabel = document.createElement('div');
+                            timeLabel.className = 'time-label';
+                            timeLabel.textContent = `${hour}:00`;
+                            timeSlot.appendChild(timeLabel);
+                        }
+                        
+                        weekGrid.appendChild(timeSlot);
+                    }
+                }
+            }
+            
+            // Load events from the server
+            function loadEvents() {
+                fetch('/api/events')
+                    .then(response => {
+                        if (response.status === 401) {
+                            checkAuth();
+                            return [];
+                        }
+                        return response.json();
+                    })
+                    .then(events => {
+                        renderEvents(events);
+                    })
+                    .catch(error => {
+                        console.error('Error loading events:', error);
+                    });
+            }
+            
+            // Render events on the calendar
+            function renderEvents(googleEvents) {
+                // Clear existing events
+                document.querySelectorAll('.event').forEach(el => el.remove());
+                
+                const startOfWeek = getStartOfWeek(currentDate);
+                
+                googleEvents.forEach(event => {
+                    if (!event.start.dateTime) return;  // Skip all-day events
+                    
+                    const eventStart = new Date(event.start.dateTime);
+                    const eventEnd = new Date(event.end.dateTime);
+                    
+                    // Calculate position in the grid
+                    const dayOfWeek = (eventStart.getDay() + 6) % 7; // Convert to 0-6 (Monday-Sunday)
+                    const startHour = eventStart.getHours();
+                    const startMinute = eventStart.getMinutes();
+                    const durationMinutes = (eventEnd - eventStart) / (1000 * 60);
+                    
+                    // Create event element
+                    const eventElement = document.createElement('div');
+                    eventElement.className = 'event';
+                    eventElement.style.gridColumn = dayOfWeek + 2; // +2 because first column is time
+                    eventElement.style.gridRow = `span ${Math.max(1, Math.ceil(durationMinutes / 30))}`;
+                    eventElement.style.gridRowStart = startHour * 2 + (startMinute >= 30 ? 1 : 0) + 1;
+                    
+                    eventElement.innerHTML = `
+                        <div class="event-title">${event.summary || 'No title'}</div>
+                        <div class="event-time">${formatTime(eventStart)} - ${formatTime(eventEnd)}</div>
+                    `;
+                    
+                    // Add click handler to show details
+                    eventElement.addEventListener('click', () => showEventDetails(event));
+                    
+                    weekGrid.appendChild(eventElement);
+                });
+            }
+            
+            // Show event details in modal
+            function showEventDetails(event) {
+                document.getElementById('detailTitle').textContent = event.summary || 'No title';
+                
+                const start = event.start.dateTime ? new Date(event.start.dateTime) : null;
+                const end = event.end.dateTime ? new Date(event.end.dateTime) : null;
+                
+                document.getElementById('detailTime').textContent = start && end 
+                    ? `${formatDateTime(start)} to ${formatDateTime(end)}`
+                    : 'All day event';
+                
+                document.getElementById('detailLocation').textContent = event.location || 'Not specified';
+                document.getElementById('detailDescription').textContent = event.description || 'No description';
+                
+                const attendees = event.attendees 
+                    ? event.attendees.map(a => a.email).join(', ')
+                    : 'No attendees';
+                document.getElementById('detailParticipants').textContent = attendees;
+                
+                // Store the current event ID for deletion
+                currentEventId = event.id;
+                
+                eventDetailsModal.show();
+            }
+            
+            // Helper function to format time
+            function formatTime(date) {
+                return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            }
+            
+            // Helper function to format date and time
+            function formatDateTime(date) {
+                return date.toLocaleString([], {
+                    weekday: 'short',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            }
+            
+            // Event listeners
+            prevWeekBtn.addEventListener('click', () => {
+                currentDate.setDate(currentDate.getDate() - 7);
+                updateWeekDisplay();
+                loadEvents();
+            });
+            
+            nextWeekBtn.addEventListener('click', () => {
+                currentDate.setDate(currentDate.getDate() + 7);
+                updateWeekDisplay();
+                loadEvents();
+            });
+            
+            todayBtn.addEventListener('click', () => {
+                currentDate = new Date();
+                updateWeekDisplay();
+                loadEvents();
+            });
+            
+            // Parse event from natural language
+            parseEventBtn.addEventListener('click', () => {
+                const description = eventDescription.value.trim();
+                if (!description) return;
+                
+                fetch('/api/events', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ text: description })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Show parsed details
+                        document.getElementById('eventTitle').value = data.event.summary || '';
+                        document.getElementById('eventLocation').value = data.event.location || '';
+                        
+                        const startDate = new Date(data.event.start.dateTime);
+                        const endDate = new Date(data.event.end.dateTime);
+                        
+                        document.getElementById('startDate').value = startDate.toISOString().split('T')[0];
+                        document.getElementById('startTime').value = startDate.toTimeString().substring(0, 5);
+                        document.getElementById('endDate').value = endDate.toISOString().split('T')[0];
+                        document.getElementById('endTime').value = endDate.toTimeString().substring(0, 5);
+                        document.getElementById('eventNotes').value = data.event.description || '';
+                        
+                        parsedDetails.style.display = 'block';
+                        parseEventBtn.style.display = 'none';
+                        saveEventBtn.style.display = 'block';
+                    } else {
+                        alert('Error parsing event: ' + (data.error || 'Unknown error'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error parsing event');
+                });
+            });
+            
+            // Save event to Google Calendar
+            saveEventBtn.addEventListener('click', () => {
+                const eventData = {
+                    title: document.getElementById('eventTitle').value,
+                    location: document.getElementById('eventLocation').value,
+                    start_date: document.getElementById('startDate').value,
+                    start_time: document.getElementById('startTime').value,
+                    end_date: document.getElementById('endDate').value,
+                    end_time: document.getElementById('endTime').value,
+                    description: document.getElementById('eventNotes').value
+                };
+                
+                fetch('/api/events', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ text: JSON.stringify(eventData) })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        loadEvents();
+                        addEventModal.hide();
+                        // Reset form
+                        eventDescription.value = '';
+                        parsedDetails.style.display = 'none';
+                        parseEventBtn.style.display = 'block';
+                        saveEventBtn.style.display = 'none';
+                    } else {
+                        alert('Error saving event: ' + (data.error || 'Unknown error'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error saving event');
+                });
+            });
+            
+            // Delete event
+            deleteEventBtn.addEventListener('click', () => {
+                if (!currentEventId) return;
+                
+                fetch(`/api/events/${currentEventId}`, {
+                    method: 'DELETE'
+                })
+                .then(response => {
+                    if (response.ok) {
+                        loadEvents();
+                        eventDetailsModal.hide();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error deleting event:', error);
+                });
+            });
+            
+            // Ask the AI assistant
+            askButton.addEventListener('click', sendQuery);
+            userQuery.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') sendQuery();
+            });
+            
+            function sendQuery() {
+                const query = userQuery.value.trim();
+                if (!query) return;
+                
+                // Add user message to chat
+                const userMessage = document.createElement('div');
+                userMessage.className = 'message user-message';
+                userMessage.textContent = query;
+                chatContainer.appendChild(userMessage);
+                
+                // Clear input
+                userQuery.value = '';
+                
+                // Show typing indicator
+                const typingIndicator = document.createElement('div');
+                typingIndicator.className = 'message assistant-message';
+                typingIndicator.textContent = 'Henry is typing...';
+                chatContainer.appendChild(typingIndicator);
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+                
+                // Send query to backend
+                fetch('/api/ask', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ query: query })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // Remove typing indicator
+                    chatContainer.removeChild(typingIndicator);
+                    
+                    // Add assistant response
+                    const assistantMessage = document.createElement('div');
+                    assistantMessage.className = 'message assistant-message';
+                    assistantMessage.textContent = data.response || "I couldn't process your request.";
+                    chatContainer.appendChild(assistantMessage);
+                    chatContainer.scrollTop = chatContainer.scrollHeight;
+                    
+                    // If the response includes event suggestions, reload events
+                    if (data.response.toLowerCase().includes('event') || 
+                        data.response.toLowerCase().includes('meeting') ||
+                        data.response.toLowerCase().includes('appointment')) {
+                        loadEvents();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    // Remove typing indicator
+                    chatContainer.removeChild(typingIndicator);
+                    
+                    const errorMessage = document.createElement('div');
+                    errorMessage.className = 'message assistant-message';
+                    errorMessage.textContent = "Sorry, I'm having trouble connecting to the server.";
+                    chatContainer.appendChild(errorMessage);
+                    chatContainer.scrollTop = chatContainer.scrollHeight;
+                });
+            }
+            
+            // Initialize the calendar
+            initCalendar();
+        });
+    </script>
+</body>
+</html>
